@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Parqueadero Inteligente - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    </head>
+<body>
+    <div class="container"> 
+        <header>
+            <div class="header-left">
+                <img src="{{ url_for('static', filename='img/Logo_parqueadero.gif') }}" alt="Logo Parqueadero" class="app-logo">
+                
+                <h1>PARQUEADERO INTELIGENTE</h1>
+            </div>
+
+            <div id="header-right-controls"> 
+                
+                <div>
+                    <a href="{{ url_for('historial') }}">
+                        <button class="btn-historial">Ir a Historial</button>
+                    </a>
+                </div>
+                
+                </div>
+        </header>
+
+        <div class="controles-inferiores">
+            <button id="toggle-tarifas" class="btn-config" onclick="toggleTarifas(true)">⚙️ Configurar Tarifas</button>
+
+            <div id="search-bar-container">
+                <input 
+                    type="text" 
+                    id="search-input" 
+                    placeholder="Buscar Placa o Cubículo..." 
+                    onkeyup="handleSearchInput(event)"
+                >
+                <button class="btn-primary" onclick="searchCubicles()">Buscar</button>
+                <button class="btn-secondary" onclick="clearSearch()">Limpiar</button>
+            </div>
+        </div>
+
+
+        <div id="tarifas-modal-backdrop" class="modal-backdrop">
+            <div id="tarifas-config" class="panel modal-content">
+                <h2>Configuración de Tarifas</h2>
+                <div id="tarifas-display">
+                    Cargando tarifas...
+                </div>
+                <button class="btn-cerrar-config" onclick="toggleTarifas(false)">×</button>
+            </div>
+        </div>
+        
+        <div id="parqueadero-grid">
+        </div>
+
+        <div id="cobro-info" class="panel">
+            <h2>Detalles de Cobro</h2>
+            <p>Seleccione un cubículo ocupado o reservado para ver detalles.</p>
+            
+            <div id="detalle-cobro-activo" style="display: none;">
+                <p>Cubículo: <strong id="cobro-nombre"></strong></p>
+                <p>Placa: <strong id="cobro-placa"></strong> <button onclick="toggleModalEdicion(true)" class="btn-editar-placa">✏️ Editar</button></p> 
+                
+                <div id="info-cobro-container">
+                    <p>Hora Ingreso: <span id="cobro-ingreso"></span></p>
+                    <p>Tiempo Actual: <span id="cobro-tiempo"></span></p>
+                    <p>Monto a Cobrar: <span id="cobro-monto"></span></p>
+                </div>
+
+                <input type="hidden" id="registro-id-activo"> 
+                
+                <div id="botones-accion-container">
+                </div>
+            </div>
+        </div>
+        
+        <div id="edicion-placa-modal-backdrop" class="modal-backdrop">
+            <div class="modal-content">
+                <h3>Editar Placa</h3>
+                <label for="modal-placa">Nueva Placa:</label>
+                <input type="text" id="modal-placa" placeholder="Ej: ABC123D" style="width: 90%; padding: 8px; margin-bottom: 10px;">
+                <input type="hidden" id="registro-id-edicion">
+                <button onclick="guardarEdicionPlaca()">Guardar Placa</button>
+                <button onclick="toggleModalEdicion(false)">Cancelar</button>
+            </div>
+        </div>
+    </div> 
+
+    <script src="{{ url_for('static', filename='js/monitor.js') }}"></script>
+</body>
+</html>

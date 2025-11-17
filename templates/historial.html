@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Historial de Cobros</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <style>
+        /* Se elimina el ESTILO PARA EL FONDO ANIMADO */
+
+        /* 🔑 CAMBIO: Estilo del Degradado y Centrado del Encabezado (para Historial) */
+        .historial-header {
+            /* Degradado de Amarillo/Blanco */
+            background-image: linear-gradient(to right, 
+                rgba(235, 218, 30, 0.18) 0%, /* Amarillo muy suave */
+                #e4e139 50%, 
+                #f5d20e 100%); 
+            background-color: #e3ec93; /* Fallback */
+
+            /* Asegurar centrado y alineación (tomado de la lógica CSS externa) */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        /* Asegurar que el título se centre si el CSS externo no lo hace */
+        .historial-header h1 {
+            flex-grow: 1; 
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <div class="historial-header">
+            <img src="{{ url_for('static', filename='img/Logo_parqueadero.gif') }}" alt="Logo Parqueadero" class="app-logo">
+            <h1>HISTORIAL DE COBROS</h1>
+            <a href="/" class="btn-dashboard">Ir a Dashboard</a>
+        </div>
+        
+        <div class="filtro-container">
+            <h2>Filtros</h2>
+            <label for="fecha-inicio">Desde:</label>
+            <input type="date" id="fecha-inicio">
+            <label for="fecha-fin">Hasta:</label>
+            <input type="date" id="fecha-fin">
+            <button onclick="cargarHistorial()">Aplicar Filtro</button>
+            
+            <button onclick="limpiarFiltros()" class="btn-limpiar">Limpiar Filtros</button>
+
+            <label for="busqueda-texto">Buscar (Placa/Cubículo):</label>
+            <input type="text" id="busqueda-texto" onkeyup="filtrarTabla()">
+        </div>
+
+        <div id="sumatoria-container">
+            <div id="sumatoria-total" class="total-box">
+                TOTAL COBRADO: $0 COP
+            </div>
+            <div id="sumatoria-carros" class="total-box">
+                <h4><span class="icon">🚗</span> CARROS</h4>
+                <p>Total Cobrado: <span id="total-carros">$0 COP</span></p>
+                <p>Cantidad de Cobros: <span id="count-carros">0</span></p>
+            </div>
+            <div id="sumatoria-motos" class="total-box">
+                <h4><span class="icon">🏍️</span> MOTOS</h4>
+                <p>Total Cobrado: <span id="total-motos">$0 COP</span></p>
+                <p>Cantidad de Cobros: <span id="count-motos">0</span></p>
+            </div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Reg.</th>
+                    <th>Cubículo</th>
+                    <th>Placa</th> <th>Hora Ingreso</th>
+                    <th>Hora Salida</th>
+                    <th>Tiempo (Min)</th>
+                    <th>Monto Cobrado</th>
+                    <th>Voucher</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-body">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', cargarHistorial);
+
+        /**
+         * Formatea un número como moneda colombiana (COP), asegurando cero decimales.
+         */
+        function formatCurrency(amount) {
+            const numericAmount = parseFloat(amount);
+            if (isNaN(numericAmount)) return amount;
+            
+            return new Intl.NumberFormat('es-CO', { 
+                style: 'currency', 
+                currency: 'COP', 
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0 
+            }).format(numericAmount);
+        }
+        
+        function formatDateTime(dateTimeStr) {
+            if (!dateTimeStr) return '';
+            return new Date(dateTimeStr).toLocaleString('es-CO', { 
+                year: 'numeric', 
+                month: 'numeric', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+        }
+
+        function limpiarFiltros() {
+            document.getElementById('fecha-inicio').value = '';
+            document.getElementById('fecha-fin').value = '';
+            document.getElementById('busqueda-texto').value = '';
+            cargarHistorial(); // Recargar sin filtros de fecha ni búsqueda de texto
+        }
+
+        function cargarHistorial() {
+            const fechaInicio = document.getElementById('fecha-inicio').value;
+            const fechaFin = document.getElementById('fecha-fin').value;
+            
+            let apiUrl = '/api/reporte';
+            const params = [];
+            
+            if (fechaInicio) params.push(`inicio=${fechaInicio}`);
+            if (fechaFin) params.push(`fin=${fechaFin}`);
+            
+            if (params.length > 0) {
+                apiUrl += '?' + params.join('&');
+            }
+
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const tablaBody = document.getElementById('tabla-body');
+                    tablaBody.innerHTML = ''; 
+
+                    // 1. Obtener datos de carro y moto de forma segura
+                    const carroData = data.conteo_tipos.CARRO || { total_cobrado: 0, cantidad: 0 };
+                    const motoData = data.conteo_tipos.MOTO || { total_cobrado: 0, cantidad: 0 };
+
+                    // 2. Actualizar las sumatorias por tipo de vehículo
+                    document.querySelector('#sumatoria-carros p:nth-child(2)').textContent = 
+                        `Total Cobrado: ${formatCurrency(carroData.total_cobrado)}`;
+                    document.querySelector('#sumatoria-carros p:nth-child(3)').textContent = 
+                        `Cantidad: ${carroData.cantidad}`;
+
+                    document.querySelector('#sumatoria-motos p:nth-child(2)').textContent = 
+                        `Total Cobrado: ${formatCurrency(motoData.total_cobrado)}`;
+                    document.querySelector('#sumatoria-motos p:nth-child(3)').textContent = 
+                        `Cantidad: ${motoData.cantidad}`;
+
+
+                    if (data.historial && data.historial.length > 0) {
+                        data.historial.forEach(registro => {
+                            const row = tablaBody.insertRow();
+                            
+                            // Almacenar el objeto JSON para calcular el monto al filtrar por texto
+                            row.dataset.registro = JSON.stringify(registro); 
+
+                            row.insertCell().textContent = registro.id;
+                            row.insertCell().textContent = registro.cubiculo;
+                            row.insertCell().textContent = registro.placa || 'N/A';
+                            row.insertCell().textContent = formatDateTime(registro.hora_ingreso);
+                            row.insertCell().textContent = formatDateTime(registro.hora_salida);
+                            row.insertCell().textContent = registro.tiempo_total_minutos;
+                            row.insertCell().textContent = formatCurrency(registro.monto_cobrado);
+                            
+                            const voucherCell = row.insertCell();
+                            voucherCell.innerHTML = `
+                                <button class="btn-voucher" title="Descargar Voucher" onclick='imprimirVoucherSalida(${JSON.stringify(registro)})'>
+                                    ⬇️ 
+                                </button>
+                            `;
+                        });
+                        
+                        // Llamar a filtrarTabla para calcular la Sumatoria Total (Visible) inicial
+                        filtrarTabla();
+
+                    } else {
+                        const row = tablaBody.insertRow();
+                        const cell = row.insertCell(0);
+                        cell.colSpan = 8;
+                        cell.textContent = "No se encontraron registros de cobro para el período seleccionado.";
+                        cell.style.textAlign = 'center';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al cargar el historial:', error);
+                    alert("Error al cargar los datos. Revisa la terminal del servidor (app.py) para ver el error de la API.");
+                });
+        }
+
+        /**
+         * Realiza el filtrado instantáneo de la tabla por Placa o Cubículo,
+         * y RECALCULA la sumatoria total de las filas VISIBLES. 
+         */
+        function filtrarTabla() {
+            const input = document.getElementById('busqueda-texto');
+            const filtro = input.value.toUpperCase().trim();
+            const tablaBody = document.getElementById('tabla-body');
+            const filas = tablaBody.getElementsByTagName('tr'); 
+            
+            let sumatoriaTotalFiltrada = 0;
+            
+            for (let i = 0; i < filas.length; i++) {
+                // Saltar la fila de "No se encontraron resultados" o filas incompletas
+                if (filas[i].classList.contains('no-results') || filas[i].getElementsByTagName('td').length < 8) continue;
+                
+                const celdaCubiculo = filas[i].getElementsByTagName('td')[1]; 
+                const celdaPlaca = filas[i].getElementsByTagName('td')[2];   
+                
+                let encontrado = false;
+                
+                if (filtro.length > 0) {
+                    if (celdaCubiculo && celdaCubiculo.textContent.toUpperCase().indexOf(filtro) > -1) {
+                        encontrado = true;
+                    } else if (celdaPlaca && celdaPlaca.textContent.toUpperCase().indexOf(filtro) > -1) {
+                        encontrado = true;
+                    }
+                } else {
+                    encontrado = true;
+                }
+
+                if (encontrado) {
+                    filas[i].style.display = "";
+                    
+                    // Recalcular Sumatoria: Obtener el monto del data-attribute (JSON)
+                    const registroData = JSON.parse(filas[i].dataset.registro);
+                    const monto = parseFloat(registroData.monto_cobrado) || 0;
+                    sumatoriaTotalFiltrada += monto;
+
+                } else {
+                    filas[i].style.display = "none";
+                }
+            }
+
+            // ACTUALIZAR EL TOTAL MOSTRADO
+            document.getElementById('sumatoria-total').textContent = 
+                `TOTAL COBRADO: ${formatCurrency(sumatoriaTotalFiltrada)}`;
+        }
+
+
+        /**
+         * Genera un voucher de SALIDA (cobro) a partir del registro del historial.
+         */
+        function imprimirVoucherSalida(registro) {
+            const horaIngresoCompleta = registro.hora_ingreso;
+            const [fechaIngreso, horaIngreso] = horaIngresoCompleta.split(' ');
+            
+            const horaSalidaCompleta = registro.hora_salida;
+            const [fechaSalida, horaSalida] = horaSalidaCompleta.split(' ');
+
+            const monto = formatCurrency(registro.monto_cobrado);
+            const minutos = registro.tiempo_total_minutos;
+            
+            const horas = (minutos / 60).toFixed(1);
+            const tiempoTotalDisplay = `${minutos} min (${horas} horas)`; 
+
+            const tipoVehiculo = registro.tipo_vehiculo || (registro.cubiculo.startsWith('A') ? 'CARRO' : 'MOTO');
+            const placa = registro.placa || 'N/A';
+            
+            const voucherHTML = `
+                <div class="voucher-content" style="width: 250px; padding: 15px; font-family: 'Courier New', monospace; font-size: 12px; margin: 0 auto; line-height: 1.5;">
+                    <h3 style="text-align: center; margin: 0; padding-bottom: 5px; border-bottom: 1px dashed #000;">
+                        PARQUEADERO INTELIGENTE
+                    </h3>
+                    <p style="text-align: center; margin-top: 5px;">TICKET DE COBRO FINAL</p>
+                    
+                    <p style="border-top: 1px dashed #000; padding-top: 10px;">
+                        <strong>RECIBO N°:</strong> ${registro.id}<br>
+                        <strong>PLACA:</strong> ${placa}<br> <strong>CUBÍCULO:</strong> ${registro.cubiculo}<br>
+                        <strong>TIPO:</strong> ${tipoVehiculo}<br>
+                    </p>
+
+                    <p>
+                        <strong>--- DETALLE ---</strong><br>
+                        <strong>Ingreso:</strong> ${fechaIngreso} ${horaIngreso}<br>
+                        <strong>Salida:</strong> ${fechaSalida} ${horaSalida}<br>
+                        <strong>Tiempo Total:</strong> ${tiempoTotalDisplay}<br> 
+                    </p>
+
+                    <h4 style="border-top: 1px dashed #000; padding-top: 10px; text-align: center;">
+                        VALOR COBRADO
+                    </h4>
+                    <h3 style="text-align: center; margin: 0; font-size: 1.5em;">
+                        ${monto}
+                    </h3>
+                    
+                    <p style="text-align: center; margin-top: 15px; font-size: 10px; border-top: 1px dashed #000; padding-top: 10px;">
+                        ¡GRACIAS POR SU VISITA!
+                    </p>
+                </div>
+            `;
+
+            const printWindow = window.open('', '_blank', 'height=600,width=350');
+            printWindow.document.write('<html><head><title>Voucher de Salida</title>');
+            printWindow.document.write(`
+                <style>
+                    @media print {
+                        body { margin: 0; padding: 0; }
+                        .voucher-content { 
+                            border: none !important; 
+                            box-shadow: none !important;
+                        }
+                    }
+                </style>
+            `);
+            printWindow.document.write('</head><body>');
+            printWindow.document.write(voucherHTML);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+
+            printWindow.onload = function() {
+                printWindow.print();
+            }
+        }
+    </script>
+</body>
+</html>
