@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  parqueadero:
+    build: .
+    container_name: parqueadero_inteligente
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    restart: always
